@@ -18,18 +18,38 @@ const ELEMENTS = ["水", "火", "木", "金", "土"];
 const POSITIONS = ["元", "上", "中", "下", "末"];
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
+const getCycleIndexes = (year: number) => {
+    const yearOffset = Math.max(0, year - 1);
+    const offsetInEra = yearOffset % 3000;
+    const offsetInGreatNumber = offsetInEra % 300;
+
+    return {
+        eraIdx: Math.min(4, Math.floor(yearOffset / 3000)),
+        gnIdx: Math.min(9, Math.floor(offsetInEra / 300)),
+        eleIdx: Math.min(4, Math.floor(offsetInGreatNumber / 60)),
+        posIdx: Math.min(4, Math.floor((offsetInGreatNumber % 60) / 12)),
+        yearOffset: yearOffset % 12
+    };
+};
+
 export const TianInteractiveDeduction: React.FC<{ onDateChange?: (y: number, m: number, d: number) => void }> = ({ onDateChange }) => {
+    const [initialTianDate] = useState(() => fromGregorian(new Date()));
+    const initialCycle = getCycleIndexes(initialTianDate.year);
+
     // 基础纪元状态
-    const [eraIdx, setEraIdx] = useState(2);
-    const [gnIdx, setGnIdx] = useState(0);
-    const [eleIdx, setEleIdx] = useState(0);
-    const [posIdx, setPosIdx] = useState(0);
-    const [month, setMonth] = useState(1);
-    const [day, setDay] = useState(1);
-    const [yearOffset, setYearOffset] = useState(0); // V0.27: 记录 12 年周期内的精准流年残差 (0~11)
+    const [eraIdx, setEraIdx] = useState(initialCycle.eraIdx);
+    const [gnIdx, setGnIdx] = useState(initialCycle.gnIdx);
+    const [eleIdx, setEleIdx] = useState(initialCycle.eleIdx);
+    const [posIdx, setPosIdx] = useState(initialCycle.posIdx);
+    const [month, setMonth] = useState(initialTianDate.month);
+    const [day, setDay] = useState(initialTianDate.day);
+    const [yearOffset, setYearOffset] = useState(initialCycle.yearOffset);
 
     // 查询器状态
-    const [queryDate, setQueryDate] = useState({ y: 2024, m: 3, d: 8 });
+    const [queryDate, setQueryDate] = useState(() => {
+        const today = new Date();
+        return { y: today.getFullYear(), m: today.getMonth() + 1, d: today.getDate() };
+    });
 
     const [events, setEvents] = useState<TianEvent[]>([]);
     const [activeEvent, setActiveEvent] = useState<TianEvent | null>(null);

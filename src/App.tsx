@@ -1,10 +1,20 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { CalendarView } from './components/CalendarView';
-import { CulturePage } from './components/CulturePage'; // 重命名自 info
-import { TianPage } from './components/TianPage';       // 重命名自 solarterm
-import { MayanPage } from './components/MayanPage';
-import { AboutPage } from './components/AboutPage';
 import { getCalendarData } from './utils/calendarCore';
+
+const CulturePage = lazy(() => import('./components/CulturePage').then(({ CulturePage }) => ({ default: CulturePage })));
+const TianPage = lazy(() => import('./components/TianPage').then(({ TianPage }) => ({ default: TianPage })));
+const MayanPage = lazy(() => import('./components/MayanPage').then(({ MayanPage }) => ({ default: MayanPage })));
+const AboutPage = lazy(() => import('./components/AboutPage').then(({ AboutPage }) => ({ default: AboutPage })));
+
+const PageLoading = () => (
+  <div className="min-h-[50vh] flex items-center justify-center" role="status" aria-live="polite">
+    <div className="flex items-center gap-3 text-stone-400">
+      <span className="w-5 h-5 rounded-full border-2 border-amber-500/30 border-t-amber-400 animate-spin" aria-hidden="true" />
+      <span className="text-sm">正在载入...</span>
+    </div>
+  </div>
+);
 
 function App() {
   const [activeTab, setActiveTab] = useState<'calendar' | 'info' | 'tian' | 'mayan' | 'about'>('calendar');
@@ -102,15 +112,17 @@ function App() {
 
       {/* Main Content Area */}
       <main className="pt-32 md:pt-24 pb-12 relative z-10">
-        {activeTab === 'calendar' && (
-          <CalendarView
-            onDateChange={setCurrentDate}
-          />
-        )}
-        {activeTab === 'info' && <CulturePage />}
-        {activeTab === 'tian' && <TianPage />}
-        {activeTab === 'mayan' && <MayanPage />}
-        {activeTab === 'about' && <AboutPage />}
+        <Suspense fallback={<PageLoading />}>
+          {activeTab === 'calendar' && (
+            <CalendarView
+              onDateChange={setCurrentDate}
+            />
+          )}
+          {activeTab === 'info' && <CulturePage />}
+          {activeTab === 'tian' && <TianPage />}
+          {activeTab === 'mayan' && <MayanPage />}
+          {activeTab === 'about' && <AboutPage />}
+        </Suspense>
       </main>
 
     </div>

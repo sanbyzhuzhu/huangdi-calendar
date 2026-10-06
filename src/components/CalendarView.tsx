@@ -32,7 +32,16 @@ export const CalendarView: React.FC<{ onDateChange?: (d: Date) => void }> = ({ o
     };
 
     // Notes system
-    const { addNote, updateNote, deleteNote, getMMDD, getNotesForDayAcrossYears } = usePersonalNotes();
+    const {
+        addNote,
+        updateNote,
+        deleteNote,
+        getMMDD,
+        getNotesForDayAcrossYears,
+        getAllNotes,
+        exportData,
+        importData
+    } = usePersonalNotes();
     const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
     const [isManagerModalOpen, setIsManagerModalOpen] = useState(false);
     const [noteContent, setNoteContent] = useState('');
@@ -44,9 +53,6 @@ export const CalendarView: React.FC<{ onDateChange?: (d: Date) => void }> = ({ o
     // 跨年今日：获取所有年份中这一天的记录
     const todaysNotes = getNotesForDayAcrossYears(getMMDD(data.gregorian.dateStr));
     const historicalEvent = currentDateMMDD && historyData[currentDateMMDD] ? historyData[currentDateMMDD] : null;
-
-    // We get the extra functions needed for the manager from the hook
-    const { getAllNotes, exportData, importData } = usePersonalNotes();
 
     const openNoteModal = (noteId?: string, existingContent?: string) => {
         if (noteId && existingContent) {
@@ -126,16 +132,16 @@ export const CalendarView: React.FC<{ onDateChange?: (d: Date) => void }> = ({ o
                 {/* Date Controller */}
                 <div className="flex flex-col items-center gap-2">
                     <div className="flex items-center gap-4 glass-panel px-6 py-3 rounded-full">
-                        <button onClick={() => addDays(-1)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                        <button type="button" onClick={() => addDays(-1)} aria-label="前一天" className="p-2 hover:bg-white/10 rounded-full transition-colors">
                             <ChevronLeft size={20} />
                         </button>
                         <div className="text-center w-40">
                             <div className="text-xl font-medium tracking-wider">{data.gregorian.dateStr}</div>
                         </div>
-                        <button onClick={() => addDays(1)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                        <button type="button" onClick={() => addDays(1)} aria-label="后一天" className="p-2 hover:bg-white/10 rounded-full transition-colors">
                             <ChevronRight size={20} />
                         </button>
-                        <button onClick={() => selectDate(new Date())} className="ml-4 text-xs bg-amber-600/20 text-amber-500 px-3 py-1 rounded-full border border-amber-500/30 hover:bg-amber-600/40 transition-colors">
+                        <button type="button" onClick={() => selectDate(new Date())} aria-label="回到今天" className="ml-4 text-xs bg-amber-600/20 text-amber-500 px-3 py-1 rounded-full border border-amber-500/30 hover:bg-amber-600/40 transition-colors">
                             TODAY
                         </button>
                     </div>
@@ -149,6 +155,7 @@ export const CalendarView: React.FC<{ onDateChange?: (d: Date) => void }> = ({ o
                         ))}
                         <input
                             type="text"
+                            aria-label="跳转到年份"
                             value={localYear}
                             onChange={(e) => setLocalYear(e.target.value)}
                             onBlur={() => {
@@ -335,6 +342,8 @@ export const CalendarView: React.FC<{ onDateChange?: (d: Date) => void }> = ({ o
                             {totalPages > 1 && (
                                 <div className="flex items-center justify-center gap-4 mt-6 pt-4 border-t border-white/5">
                                     <button
+                                        type="button"
+                                        aria-label="上一页时空印记"
                                         onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                                         disabled={currentPage === 1}
                                         className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-stone-400 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
@@ -345,6 +354,8 @@ export const CalendarView: React.FC<{ onDateChange?: (d: Date) => void }> = ({ o
                                         <span className="text-amber-500">{currentPage}</span> / {totalPages} 页
                                     </div>
                                     <button
+                                        type="button"
+                                        aria-label="下一页时空印记"
                                         onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                                         disabled={currentPage === totalPages}
                                         className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-stone-400 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
@@ -382,6 +393,8 @@ export const CalendarView: React.FC<{ onDateChange?: (d: Date) => void }> = ({ o
             {/* Floating Action Button */}
             <div className="fixed bottom-8 right-8 z-[60]">
                 <button
+                    type="button"
+                    aria-label="添加时空印记"
                     onClick={() => openNoteModal()}
                     className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-[0_0_20px_rgba(245,158,11,0.4)] flex items-center justify-center hover:scale-110 hover:shadow-[0_0_30px_rgba(245,158,11,0.6)] transition-all"
                 >
@@ -400,6 +413,7 @@ export const CalendarView: React.FC<{ onDateChange?: (d: Date) => void }> = ({ o
                         onMouseDown={(e) => {
                             if (e.target === e.currentTarget) setIsNoteModalOpen(false);
                         }}
+                        role="presentation"
                     >
                         <motion.div
                             initial={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -407,12 +421,15 @@ export const CalendarView: React.FC<{ onDateChange?: (d: Date) => void }> = ({ o
                             exit={{ scale: 0.9, opacity: 0, y: 20 }}
                             onClick={(e) => e.stopPropagation()}
                             className="bg-stone-900 border border-amber-500/30 w-full max-w-md rounded-2xl p-6 shadow-2xl mt-8"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="note-editor-title"
                         >
                             <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-xl font-bold text-amber-500 flex items-center gap-2">
+                                <h3 id="note-editor-title" className="text-xl font-bold text-amber-500 flex items-center gap-2">
                                     <Book size={20} /> {editingNoteId ? '修改时空印记' : '添加时空印记'}
                                 </h3>
-                                <button onClick={() => setIsNoteModalOpen(false)} className="text-stone-400 hover:text-white"><X size={20} /></button>
+                                <button type="button" onClick={() => setIsNoteModalOpen(false)} aria-label="关闭时空印记编辑" className="text-stone-400 hover:text-white"><X size={20} /></button>
                             </div>
                             <div className="mb-4 text-sm text-stone-400">
                                 {editingNoteId ? '正在重新编辑' : '为'} <span className="text-amber-400 font-bold">{data.gregorian.dateStr}</span> 留下您的记录：

@@ -638,7 +638,7 @@ export const MayanPage: React.FC = () => {
                                     <span className="px-2 py-0.5 rounded-sm bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-300">家族：{TOTEMS[mayan.totemIdx].family}</span>
                                 )}
                             </div>
-                            <p className="text-stone-400 leading-relaxed text-sm">
+                            <div className="text-stone-400 leading-relaxed text-sm">
                                 今日是银河音调历（卓尔金历）的第 <span className="text-pink-400 font-bold">{mayan.toneNum}</span> 音调 ·
                                 <span className="text-rose-400 font-bold">「{mayan.toneNameCN}」</span>，
                                 图腾为 <span className="text-amber-400 font-bold">「{mayan.tzolkinNameCN}」</span>。
@@ -653,7 +653,7 @@ export const MayanPage: React.FC = () => {
                                         “{TONES[mayan.toneNum - 1]?.meditation}”
                                     </div>
                                 </div>
-                            </p>
+                            </div>
                         </div>
 
                         {/* ⚡ 7等离子体 — 全部展示，点击跳转对应日期，联动整页 */}

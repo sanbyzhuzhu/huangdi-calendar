@@ -13,6 +13,73 @@ export interface NotesStore {
 
 const STORAGE_KEY = 'ancient_calendar_notes';
 
+const isValidDateKey = (value: string): boolean => {
+    const match = /^(\d{2})-(\d{2})$/.exec(value);
+    if (!match) return false;
+
+    const month = Number(match[1]);
+    const day = Number(match[2]);
+    const date = new Date(Date.UTC(2000, month - 1, day));
+    return date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+};
+
+const isNoteEntry = (value: unknown): value is NoteEntry => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+
+    const entry = value as Record<string, unknown>;
+    return typeof entry.id === 'string'
+        && entry.id.trim().length > 0
+        && Number.isInteger(entry.year)
+        && (entry.year as number) >= 1
+        && (entry.year as number) <= 9999
+        && typeof entry.content === 'string'
+        && entry.content.trim().length > 0
+        && typeof entry.timestamp === 'number'
+        && Number.isFinite(entry.timestamp)
+        && entry.timestamp >= 0;
+};
+
+export const isNotesStore = (value: unknown): value is NotesStore => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+
+    const ids = new Set<string>();
+    return Object.entries(value).every(([dateKey, entries]) => {
+        if (!isValidDateKey(dateKey) || !Array.isArray(entries)) return false;
+
+        return entries.every((entry) => {
+            if (!isNoteEntry(entry) || ids.has(entry.id)) return false;
+            ids.add(entry.id);
+            return true;
+        });
+    });
+};
+
+const getDateKey = (dateStr: string): string | null => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+    if (match) {
+        const dateKey = `${match[2]}-${match[3]}`;
+        return isValidDateKey(dateKey) ? dateKey : null;
+    }
+
+    const date = new Date(dateStr);
+    if (Number.isNaN(date.getTime())) return null;
+    return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
+const getDateYear = (dateStr: string): number | null => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+    if (match) return Number(match[1]);
+
+    const date = new Date(dateStr);
+    return Number.isNaN(date.getTime()) ? null : date.getFullYear();
+};
+
+const saveNotes = (notes: NotesStore) => {
+    if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+    }
+};
+
 export const usePersonalNotes = () => {
     const [notes, setNotes] = useState<NotesStore>(() => {
         if (typeof localStorage === 'undefined') return {};
@@ -21,7 +88,10 @@ export const usePersonalNotes = () => {
         if (!stored) return {};
 
         try {
-            return JSON.parse(stored);
+            const parsed: unknown = JSON.parse(stored);
+            if (isNotesStore(parsed)) return parsed;
+            console.error('Invalid notes data found in local storage');
+            return {};
         } catch {
             console.error('Failed to parse notes from local storage');
             return {};
@@ -32,9 +102,9 @@ export const usePersonalNotes = () => {
     const addNote = (dateStr: string, content: string) => {
         if (!content.trim()) return;
 
-        const dateObj = new Date(dateStr);
-        const mmdd = `${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-        const year = dateObj.getFullYear();
+        const mmdd = getDateKey(dateStr);
+        const year = getDateYear(dateStr);
+        if (!mmdd || !year) return;
 
         const newEntry: NoteEntry = {
             id: crypto.randomUUID(),
@@ -43,58 +113,63 @@ export const usePersonalNotes = () => {
             timestamp: Date.now()
         };
 
-        const currentNotes = { ...notes };
-        if (!currentNotes[mmdd]) {
-            currentNotes[mmdd] = [];
-        }
-
-        // 追加并按年份倒序排序 (最新的排前面)
-        currentNotes[mmdd] = [...currentNotes[mmdd], newEntry].sort((a, b) => b.year - a.year);
-
-        setNotes(currentNotes);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentNotes));
+        setNotes((currentNotes) => {
+            const nextNotes = {
+                ...currentNotes,
+                [mmdd]: [...(currentNotes[mmdd] || []), newEntry].sort((a, b) => b.year - a.year)
+            };
+            saveNotes(nextNotes);
+            return nextNotes;
+        });
     };
 
     // 获取某一天(MM-DD)的所有笔记
     const getNotesForDate = (dateStr: string): NoteEntry[] => {
-        const dateObj = new Date(dateStr);
-        const mmdd = `${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+        const mmdd = getDateKey(dateStr);
+        if (!mmdd) return [];
         return notes[mmdd] || [];
     };
 
     // 获取当天的格式化键名用于查历史数据
     const getMMDD = (dateStr: string): string => {
-        const dateObj = new Date(dateStr);
-        return `${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+        return getDateKey(dateStr) || '';
     }
 
     // 更新笔记
     const updateNote = (dateStr: string, id: string, newContent: string) => {
         if (!newContent.trim()) return;
         const mmdd = getMMDD(dateStr);
-        const currentNotes = { ...notes };
-        if (currentNotes[mmdd]) {
-            currentNotes[mmdd] = currentNotes[mmdd].map(note =>
-                note.id === id ? { ...note, content: newContent.trim() } : note
-            );
-            setNotes(currentNotes);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(currentNotes));
-        }
+        if (!mmdd) return;
+
+        setNotes((currentNotes) => {
+            if (!currentNotes[mmdd]?.some(note => note.id === id)) return currentNotes;
+
+            const nextNotes = {
+                ...currentNotes,
+                [mmdd]: currentNotes[mmdd].map(note =>
+                    note.id === id ? { ...note, content: newContent.trim() } : note
+                )
+            };
+            saveNotes(nextNotes);
+            return nextNotes;
+        });
     };
 
     // 删除笔记
     const deleteNote = (dateStr: string, id: string) => {
         const mmdd = getMMDD(dateStr);
-        const currentNotes = { ...notes };
-        if (currentNotes[mmdd]) {
-            currentNotes[mmdd] = currentNotes[mmdd].filter(note => note.id !== id);
-            // 如果删空了，可以考虑保留空数组或者直接删除这个 key
-            if (currentNotes[mmdd].length === 0) {
-                delete currentNotes[mmdd];
-            }
-            setNotes(currentNotes);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(currentNotes));
-        }
+        if (!mmdd) return;
+
+        setNotes((currentNotes) => {
+            if (!currentNotes[mmdd]?.some(note => note.id === id)) return currentNotes;
+
+            const remainingNotes = currentNotes[mmdd].filter(note => note.id !== id);
+            const nextNotes = { ...currentNotes };
+            if (remainingNotes.length > 0) nextNotes[mmdd] = remainingNotes;
+            else delete nextNotes[mmdd];
+            saveNotes(nextNotes);
+            return nextNotes;
+        });
     };
 
 
@@ -147,14 +222,12 @@ export const usePersonalNotes = () => {
     // 导入 JSON 数据
     const importData = (jsonData: string): boolean => {
         try {
-            const parsed = JSON.parse(jsonData);
-            // 简单验证数据结构
-            if (typeof parsed === 'object' && parsed !== null) {
-                setNotes(parsed);
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-                return true;
-            }
-            return false;
+            const parsed: unknown = JSON.parse(jsonData);
+            if (!isNotesStore(parsed)) return false;
+
+            setNotes(parsed);
+            saveNotes(parsed);
+            return true;
         } catch (e) {
             console.error("Import failed:", e);
             return false;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fromGregorian } from '../utils/tianCalendar';
 import type { TianDate } from '../utils/tianCalendar';
@@ -21,13 +21,26 @@ export const TianPage: React.FC = () => {
     }, [overrideDate]);
 
     // 当推演中心发生变化时更新全局日期
-    const handleDeductionChange = (year: number, month: number, day: number) => {
-        // 创建一个模拟的天历日期对象以驱动罗盘
-        const dateObj = { ...tianDate, year, month, day };
-        // 根据月日修正 element, season 等（此处简化，实际由算法驱动）
-        setTianDate(dateObj);
-        setOverrideDate({ year, month, day });
-    };
+    const handleDeductionChange = useCallback((year: number, month: number, day: number) => {
+        setTianDate((currentDate) => {
+            if (currentDate.year === year && currentDate.month === month && currentDate.day === day) {
+                return currentDate;
+            }
+            return { ...currentDate, year, month, day };
+        });
+
+        const currentTianDate = fromGregorian(new Date());
+        setOverrideDate((currentOverride) => {
+            const isCurrentDate = currentTianDate.year === year
+                && currentTianDate.month === month
+                && currentTianDate.day === day;
+            if (isCurrentDate) return null;
+            if (currentOverride?.year === year && currentOverride.month === month && currentOverride.day === day) {
+                return currentOverride;
+            }
+            return { year, month, day };
+        });
+    }, []);
 
     // 完整的《圣太一天历》原文材料
     const scriptureText = `
